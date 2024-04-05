@@ -1,8 +1,3 @@
-# fly.toml app configuration file generated for divy-livenotes on 2024-04-05T10:38:19+05:30
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
 app = 'divy-livenotes'
 primary_region = 'hkg'
 
