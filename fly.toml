@@ -23,3 +23,7 @@ primary_region = 'hkg'
 
 [[vm]]
   size = 'shared-cpu-1x'
+
+[mounts]
+  source="storage"
+  destination="/var/notes"

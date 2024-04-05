@@ -16,24 +16,22 @@ type Note struct {
 	Body  string `json:"body"`
 }
 
-const (
-	serverURL = "http://localhost:8080" // Change this to your server URL
-)
-
 var (
+	serverURL = "https://divy-livenotes.fly.dev"
 	username = "divy" // Change this to your server username
 	password = ""     // Change this to your server password
 )
 
 func main() {
-	if len(os.Args) != 4 {
-		fmt.Println("Usage: go run client.go <filename> <username> <password>")
+	if len(os.Args) != 5 {
+		fmt.Println("Usage: go run client.go <filename> <username> <password> <serverURL>")
 		return
 	}
 
 	filename := os.Args[1]
 	username = os.Args[2]
 	password = os.Args[3]
+  serverURL = os.Args[4]
 
 	fileContents, err := ioutil.ReadFile(filename)
 	if err != nil {

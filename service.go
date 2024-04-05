@@ -26,7 +26,7 @@ type Note struct {
 var (
 	notes        []Note
 	notesLock    sync.Mutex
-	filename     = "notes.json"
+	filename     = "/var/notes/notes.json"
 	username     string
 	passwordHash []byte
 )
@@ -34,7 +34,7 @@ var (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-    // pass
+		// pass
 	}
 
 	username = os.Getenv("USERNAME")
@@ -59,6 +59,7 @@ func loadNotes() {
 	defer file.Close()
 	if err != nil {
 		fmt.Println("No existing notes found, starting fresh.")
+		os.MkdirAll("/var/notes", os.ModePerm)
 		return
 	}
 
@@ -102,13 +103,13 @@ func listNotesHandler(w http.ResponseWriter, r *http.Request) {
 	notesLock.Lock()
 	defer notesLock.Unlock()
 
-  fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article>")
-  for _, note := range notes {
-    fmt.Fprintf(w, "<h1>%s</h1><hr>%s", note.Title, mdToHTML([]byte(note.Body)))
-  }
-  fmt.Fprintf(w, "</article></body></html>")
-  w.Header().Set("Content-Type", "text/html")
-  w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article>")
+	for _, note := range notes {
+		fmt.Fprintf(w, "<h1>%s</h1><hr>%s", note.Title, mdToHTML([]byte(note.Body)))
+	}
+	fmt.Fprintf(w, "</article></body></html>")
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
 }
 
 // Handler to add or update a note
