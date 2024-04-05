@@ -51,7 +51,7 @@ func main() {
 	http.HandleFunc("/sync", authMiddleware(syncNoteHandler, username, passwordHash))
   http.HandleFunc("/delete", authMiddleware(deleteNoteHandler, username, passwordHash))
   http.HandleFunc("/share", authMiddleware(shareNoteHandler, username, passwordHash))
-  http.HandleFunc("/x", readNoteHandler)
+  http.HandleFunc("/x/", readNoteHandler)
 
 	fmt.Println("Server is running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -218,6 +218,7 @@ func syncNoteHandler(w http.ResponseWriter, r *http.Request) {
 
 func readNoteHandler(w http.ResponseWriter, r *http.Request) {
   title := r.URL.Path[3:]
+  fmt.Println("Title:", title)
   if title == "" {
     http.Error(w, "Missing title query parameter", http.StatusBadRequest)
     return
