@@ -48,6 +48,7 @@ func main() {
 
 	http.HandleFunc("/", authMiddleware(listNotesHandler, username, passwordHash))
 	http.HandleFunc("/sync", authMiddleware(syncNoteHandler, username, passwordHash))
+  http.HandleFunc("/delete", authMiddleware(deleteNoteHandler, username, passwordHash))
 
 	fmt.Println("Server is running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -110,6 +111,37 @@ func listNotesHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "</article></body></html>")
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
+}
+
+// Handler to delete a note
+func deleteNoteHandler(w http.ResponseWriter, r *http.Request) {
+  notesLock.Lock()
+  defer notesLock.Unlock()
+
+  title := r.URL.Query().Get("title")
+  if title == "" {
+    http.Error(w, "Missing title query parameter", http.StatusBadRequest)
+    return
+  }
+
+  var deleted bool
+  for i, note := range notes {
+    if note.Title == title {
+      notes = append(notes[:i], notes[i+1:]...)
+      deleted = true
+      break
+    }
+  }
+
+  if !deleted {
+    http.Error(w, "Note not found", http.StatusNotFound)
+    return
+  }
+
+  saveNotes()
+
+  w.WriteHeader(http.StatusOK)
+  fmt.Fprintf(w, "Note deleted: %s", title)
 }
 
 // Handler to add or update a note
