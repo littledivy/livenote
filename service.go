@@ -19,9 +19,9 @@ import (
 
 // Note struct represents a note
 type Note struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
-  Shared bool `json:"shared"`
+	Title  string `json:"title"`
+	Body   string `json:"body"`
+	Shared bool   `json:"shared"`
 }
 
 var (
@@ -49,9 +49,9 @@ func main() {
 
 	http.HandleFunc("/", authMiddleware(listNotesHandler, username, passwordHash))
 	http.HandleFunc("/sync", authMiddleware(syncNoteHandler, username, passwordHash))
-  http.HandleFunc("/delete", authMiddleware(deleteNoteHandler, username, passwordHash))
-  http.HandleFunc("/share", authMiddleware(shareNoteHandler, username, passwordHash))
-  http.HandleFunc("/x/", readNoteHandler)
+	http.HandleFunc("/delete", authMiddleware(deleteNoteHandler, username, passwordHash))
+	http.HandleFunc("/share", authMiddleware(shareNoteHandler, username, passwordHash))
+	http.HandleFunc("/x/", readNoteHandler)
 
 	fmt.Println("Server is running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -118,64 +118,64 @@ func listNotesHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handler for sharing a note
 func shareNoteHandler(w http.ResponseWriter, r *http.Request) {
-  notesLock.Lock()
-  defer notesLock.Unlock()
+	notesLock.Lock()
+	defer notesLock.Unlock()
 
-  title := r.URL.Query().Get("title")
-  if title == "" {
-    http.Error(w, "Missing title query parameter", http.StatusBadRequest)
-    return
-  }
+	title := r.URL.Query().Get("title")
+	if title == "" {
+		http.Error(w, "Missing title query parameter", http.StatusBadRequest)
+		return
+	}
 
-  var shared bool
-  for i, note := range notes {
-    if note.Title == title {
-      notes[i].Shared = true
-      shared = true
-      break
-    }
-  }
+	var shared bool
+	for i, note := range notes {
+		if note.Title == title {
+			notes[i].Shared = true
+			shared = true
+			break
+		}
+	}
 
-  if !shared {
-    http.Error(w, "Note not found", http.StatusNotFound)
-    return
-  }
+	if !shared {
+		http.Error(w, "Note not found", http.StatusNotFound)
+		return
+	}
 
-  saveNotes()
+	saveNotes()
 
-  w.WriteHeader(http.StatusOK)
-  fmt.Fprintf(w, "Note shared: %s", title)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Note shared: %s", title)
 }
 
 // Handler to delete a note
 func deleteNoteHandler(w http.ResponseWriter, r *http.Request) {
-  notesLock.Lock()
-  defer notesLock.Unlock()
+	notesLock.Lock()
+	defer notesLock.Unlock()
 
-  title := r.URL.Query().Get("title")
-  if title == "" {
-    http.Error(w, "Missing title query parameter", http.StatusBadRequest)
-    return
-  }
+	title := r.URL.Query().Get("title")
+	if title == "" {
+		http.Error(w, "Missing title query parameter", http.StatusBadRequest)
+		return
+	}
 
-  var deleted bool
-  for i, note := range notes {
-    if note.Title == title {
-      notes = append(notes[:i], notes[i+1:]...)
-      deleted = true
-      break
-    }
-  }
+	var deleted bool
+	for i, note := range notes {
+		if note.Title == title {
+			notes = append(notes[:i], notes[i+1:]...)
+			deleted = true
+			break
+		}
+	}
 
-  if !deleted {
-    http.Error(w, "Note not found", http.StatusNotFound)
-    return
-  }
+	if !deleted {
+		http.Error(w, "Note not found", http.StatusNotFound)
+		return
+	}
 
-  saveNotes()
+	saveNotes()
 
-  w.WriteHeader(http.StatusOK)
-  fmt.Fprintf(w, "Note deleted: %s", title)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Note deleted: %s", title)
 }
 
 // Handler to add or update a note
@@ -217,41 +217,41 @@ func syncNoteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func readNoteHandler(w http.ResponseWriter, r *http.Request) {
-  title := r.URL.Path[3:]
-  fmt.Println("Title:", title)
-  if title == "" {
-    http.Error(w, "Missing title query parameter", http.StatusBadRequest)
-    return
-  }
+	title := r.URL.Path[3:]
+	fmt.Println("Title:", title)
+	if title == "" {
+		http.Error(w, "Missing title query parameter", http.StatusBadRequest)
+		return
+	}
 
-  notesLock.Lock()
-  defer notesLock.Unlock()
+	notesLock.Lock()
+	defer notesLock.Unlock()
 
-  for _, note := range notes {
-    if note.Title == title {
-      if note.Shared {
-        fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article><h1>%s</h1><hr>%s</article></body></html>", note.Title, mdToHTML([]byte(note.Body)))
-        w.Header().Set("Content-Type", "text/html")
-        w.WriteHeader(http.StatusOK)
-        return
-      } else {
-        user, pass, ok := r.BasicAuth()
-        if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(username)) != 1 || !checkPassword(pass, passwordHash) {
-          w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
-          http.Error(w, "Unauthorized", http.StatusUnauthorized)
-          return
-        }
+	for _, note := range notes {
+		if note.Title == title {
+			if note.Shared {
+				fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article><h1>%s</h1><hr>%s</article></body></html>", note.Title, mdToHTML([]byte(note.Body)))
+				w.Header().Set("Content-Type", "text/html")
+				w.WriteHeader(http.StatusOK)
+				return
+			} else {
+				user, pass, ok := r.BasicAuth()
+				if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(username)) != 1 || !checkPassword(pass, passwordHash) {
+					w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
 
-        fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article><h1>%s</h1><hr>%s</article></body></html>", note.Title, mdToHTML([]byte(note.Body)))
-        w.Header().Set("Content-Type", "text/html")
-        w.WriteHeader(http.StatusOK)
-        return
-      }
-    }
+				fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article><h1>%s</h1><hr>%s</article></body></html>", note.Title, mdToHTML([]byte(note.Body)))
+				w.Header().Set("Content-Type", "text/html")
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+		}
+	}
 
-    http.Error(w, "Note not found", http.StatusNotFound)
-    return
-  }
+	http.Error(w, "Note not found", http.StatusNotFound)
+	return
 }
 
 // Middleware to enforce HTTP basic authentication
