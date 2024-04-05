@@ -10,6 +10,9 @@ import (
 	"os"
 	"sync"
 
+	"github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/html"
+	"github.com/gomarkdown/markdown/parser"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -31,7 +34,7 @@ var (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file:", err)
+    // pass
 	}
 
 	username = os.Getenv("USERNAME")
@@ -80,19 +83,32 @@ func saveNotes() {
 	}
 }
 
+func mdToHTML(md []byte) []byte {
+	// create markdown parser with extensions
+	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
+	p := parser.NewWithExtensions(extensions)
+	doc := p.Parse(md)
+
+	// create HTML renderer with extensions
+	htmlFlags := html.CommonFlags | html.HrefTargetBlank
+	opts := html.RendererOptions{Flags: htmlFlags}
+	renderer := html.NewRenderer(opts)
+
+	return markdown.Render(doc, renderer)
+}
+
 // Handler to list all notes
 func listNotesHandler(w http.ResponseWriter, r *http.Request) {
 	notesLock.Lock()
 	defer notesLock.Unlock()
 
-	jsonNotes, err := json.Marshal(notes)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(jsonNotes)
+  fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article>")
+  for _, note := range notes {
+    fmt.Fprintf(w, "<h1>%s</h1><hr>%s", note.Title, mdToHTML([]byte(note.Body)))
+  }
+  fmt.Fprintf(w, "</article></body></html>")
+  w.Header().Set("Content-Type", "text/html")
+  w.WriteHeader(http.StatusOK)
 }
 
 // Handler to add or update a note

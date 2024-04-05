@@ -1,0 +1,9 @@
+# flyctl launch added from .gitignore
+**/notes.json
+
+# flyctl launch added from client/.gitignore
+client/**/client
+
+# flyctl launch added from notes/.gitignore
+notes/**/.notes_config
+fly.toml
