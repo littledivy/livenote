@@ -47,7 +47,7 @@ func main() {
 
 	loadNotes()
 
-	http.HandleFunc("/", authMiddleware(listNotesHandler, username, passwordHash))
+	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/sync", authMiddleware(syncNoteHandler, username, passwordHash))
 	http.HandleFunc("/delete", authMiddleware(deleteNoteHandler, username, passwordHash))
 	http.HandleFunc("/share", authMiddleware(shareNoteHandler, username, passwordHash))
@@ -103,14 +103,30 @@ func mdToHTML(md []byte) []byte {
 }
 
 // Handler to list all notes
-func listNotesHandler(w http.ResponseWriter, r *http.Request) {
+func homeHandler(w http.ResponseWriter, r *http.Request) {
 	notesLock.Lock()
 	defer notesLock.Unlock()
 
 	fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article>")
-	for _, note := range notes {
-		fmt.Fprintf(w, "<h1>%s</h1><hr>%s", note.Title, mdToHTML([]byte(note.Body)))
+
+	// Details about server and number of notes.
+	fmt.Fprintf(w, "<h2>Welcome to livenote</h2>")
+
+	fmt.Fprintf(w, "<pre><code>")
+	fmt.Fprintf(w, "<p>Instance host: %s</p>", r.Host)
+	fmt.Fprintf(w, "<p>Notes: %d</p>", len(notes))
+	file, err := os.Open(filename)
+	defer file.Close()
+	if err != nil {
+		fmt.Fprintf(w, "<p>Storage not available</p>")
+	} else {
+		fi, _ := file.Stat()
+		fmt.Fprintf(w, "<p>Space used: %d KB / %d KB</p>", fi.Size()/1024, 2*1024*1024)
 	}
+	fmt.Fprintf(w, "</code></pre>")
+
+	fmt.Fprintf(w, "<footer><p><a href='https://github.com/littledivy/livenote'>Host your own</a></a></p></footer>")
+
 	fmt.Fprintf(w, "</article></body></html>")
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
