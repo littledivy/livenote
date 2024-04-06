@@ -108,7 +108,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	notesLock.Lock()
 	defer notesLock.Unlock()
 
-	fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article>")
+	fmt.Fprintf(w, "<html><head><meta name='viewport' content='width=device-width, initial-scale=1'><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article>")
 
 	// Details about server and number of notes.
 	fmt.Fprintf(w, "<h2>Welcome to livenote</h2>")
@@ -292,13 +292,14 @@ func renderNoteHTML(w http.ResponseWriter, note Note) {
   s := `
 <html>
   <head>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
     <link rel='stylesheet' href='https://divy.work/tufte.css'>
   </head>
   <body>
     <article>
       <h1>%s</h1>
       <hr>
-      <div contenteditable>
+      <div contenteditable style='outline: none;'>
         %s
       </div>
     </article>
