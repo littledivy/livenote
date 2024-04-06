@@ -49,6 +49,7 @@ func main() {
 
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/sync", authMiddleware(syncNoteHandler, username, passwordHash))
+  http.HandleFunc("/sync-raw", authMiddleware(syncNoteRawHandler, username, passwordHash))
 	http.HandleFunc("/delete", authMiddleware(deleteNoteHandler, username, passwordHash))
 	http.HandleFunc("/share", authMiddleware(shareNoteHandler, username, passwordHash))
 	http.HandleFunc("/x/", readNoteHandler)
@@ -196,6 +197,14 @@ func deleteNoteHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handler to add or update a note
 func syncNoteHandler(w http.ResponseWriter, r *http.Request) {
+  syncNoteHandlerInner(w, r, false)
+}
+
+func syncNoteRawHandler(w http.ResponseWriter, r *http.Request) {
+  syncNoteHandlerInner(w, r, true)
+}
+
+func syncNoteHandlerInner(w http.ResponseWriter, r *http.Request, raw bool) {
 	notesLock.Lock()
 	defer notesLock.Unlock()
 
@@ -215,7 +224,11 @@ func syncNoteHandler(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	for i, note := range notes {
 		if note.Title == updatedNote.Title {
-			notes[i].Body = updatedNote.Body
+      if !raw {
+        notes[i].Body = string(mdToHTML([]byte(updatedNote.Body)))
+      } else {
+        notes[i].Body = updatedNote.Body
+      }
 			exists = true
 			break
 		}
@@ -223,7 +236,16 @@ func syncNoteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// If the note does not exist, add it
 	if !exists {
-		notes = append(notes, updatedNote)
+		note := Note{
+      Title:  updatedNote.Title,
+      Body:   updatedNote.Body,
+      Shared: false,
+    }
+    if !raw {
+      note.Body = string(mdToHTML([]byte(updatedNote.Body)))
+    }
+
+    notes = append(notes, note)
 	}
 
 	saveNotes()
@@ -246,9 +268,7 @@ func readNoteHandler(w http.ResponseWriter, r *http.Request) {
 	for _, note := range notes {
 		if note.Title == title {
 			if note.Shared {
-				fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article><h1>%s</h1><hr>%s</article></body></html>", note.Title, mdToHTML([]byte(note.Body)))
-				w.Header().Set("Content-Type", "text/html")
-				w.WriteHeader(http.StatusOK)
+        renderNoteHTML(w, note)
 				return
 			} else {
 				user, pass, ok := r.BasicAuth()
@@ -258,9 +278,7 @@ func readNoteHandler(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				fmt.Fprintf(w, "<html><head><link rel='stylesheet' href='https://divy.work/tufte.css'></head><body><article><h1>%s</h1><hr>%s</article></body></html>", note.Title, mdToHTML([]byte(note.Body)))
-				w.Header().Set("Content-Type", "text/html")
-				w.WriteHeader(http.StatusOK)
+        renderNoteHTML(w, note)
 				return
 			}
 		}
@@ -268,6 +286,76 @@ func readNoteHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.Error(w, "Note not found", http.StatusNotFound)
 	return
+}
+
+func renderNoteHTML(w http.ResponseWriter, note Note) {
+  s := `
+<html>
+  <head>
+    <link rel='stylesheet' href='https://divy.work/tufte.css'>
+  </head>
+  <body>
+    <article>
+      <h1>%s</h1>
+      <hr>
+      <div contenteditable>
+        %s
+      </div>
+    </article>
+    <script>
+      const saveNote = (title, body) => {
+        fetch('/sync-raw', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: title,
+            body: body,
+          }),
+        });
+      };
+
+      const debounce = (func, delay) => {
+        let inDebounce;
+        return function() {
+          const context = this;
+          const args = arguments;
+          clearTimeout(inDebounce);
+          inDebounce = setTimeout(() => func.apply(context, args), delay);
+
+          document.querySelector('body').style.cursor = 'wait';
+          setTimeout(() => {
+            document.querySelector('body').style.cursor = 'auto';
+          }, delay);
+
+          const savedMessage = document.createElement('div');
+          savedMessage.innerHTML = 'Saving';
+          savedMessage.style.position = 'fixed';
+          savedMessage.style.bottom = '10px';
+          savedMessage.style.right = '10px';
+          savedMessage.style.backgroundColor = 'black';
+          savedMessage.style.color = 'white';
+          savedMessage.style.padding = '10px';
+          savedMessage.style.borderRadius = '5px';
+          document.body.appendChild(savedMessage);
+          setTimeout(() => {
+            savedMessage.remove();
+          }, 2000);
+        };
+      };
+
+      const noteTitle = '%s';
+      const noteBody = document.querySelector('div[contenteditable]');
+      noteBody.addEventListener('input', debounce(() => {
+        saveNote(noteTitle, noteBody.innerHTML);
+      }, 2000));
+    </script>
+  </body>
+</html>`
+  fmt.Fprintf(w, s, note.Title, note.Body, note.Title)
+  w.Header().Set("Content-Type", "text/html")
+  w.WriteHeader(http.StatusOK)
 }
 
 // Middleware to enforce HTTP basic authentication
