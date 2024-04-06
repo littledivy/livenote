@@ -102,7 +102,7 @@ func mdToHTML(md []byte) []byte {
 	return markdown.Render(doc, renderer)
 }
 
-// Handler to list all notes
+// Handler for the home page
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	notesLock.Lock()
 	defer notesLock.Unlock()
