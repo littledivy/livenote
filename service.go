@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
-	"github.com/gomarkdown/markdown"
-	"github.com/gomarkdown/markdown/html"
-	"github.com/gomarkdown/markdown/parser"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -48,8 +47,7 @@ func main() {
 	loadNotes()
 
 	http.HandleFunc("/", homeHandler)
-	http.HandleFunc("/sync", authMiddleware(syncNoteHandler, username, passwordHash))
-  http.HandleFunc("/sync-raw", authMiddleware(syncNoteRawHandler, username, passwordHash))
+	http.HandleFunc("/sync", authMiddleware(syncNoteRawHandler, username, passwordHash))
 	http.HandleFunc("/delete", authMiddleware(deleteNoteHandler, username, passwordHash))
 	http.HandleFunc("/share", authMiddleware(shareNoteHandler, username, passwordHash))
 	http.HandleFunc("/x/", readNoteHandler)
@@ -87,20 +85,6 @@ func saveNotes() {
 	if err := encoder.Encode(notes); err != nil {
 		log.Fatal("Error encoding notes:", err)
 	}
-}
-
-func mdToHTML(md []byte) []byte {
-	// create markdown parser with extensions
-	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
-	p := parser.NewWithExtensions(extensions)
-	doc := p.Parse(md)
-
-	// create HTML renderer with extensions
-	htmlFlags := html.CommonFlags | html.HrefTargetBlank
-	opts := html.RendererOptions{Flags: htmlFlags}
-	renderer := html.NewRenderer(opts)
-
-	return markdown.Render(doc, renderer)
 }
 
 // Handler for the home page
@@ -196,15 +180,7 @@ func deleteNoteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Handler to add or update a note
-func syncNoteHandler(w http.ResponseWriter, r *http.Request) {
-  syncNoteHandlerInner(w, r, false)
-}
-
 func syncNoteRawHandler(w http.ResponseWriter, r *http.Request) {
-  syncNoteHandlerInner(w, r, true)
-}
-
-func syncNoteHandlerInner(w http.ResponseWriter, r *http.Request, raw bool) {
 	notesLock.Lock()
 	defer notesLock.Unlock()
 
@@ -224,11 +200,7 @@ func syncNoteHandlerInner(w http.ResponseWriter, r *http.Request, raw bool) {
 	var exists bool
 	for i, note := range notes {
 		if note.Title == updatedNote.Title {
-      if !raw {
-        notes[i].Body = string(mdToHTML([]byte(updatedNote.Body)))
-      } else {
-        notes[i].Body = updatedNote.Body
-      }
+			notes[i].Body = updatedNote.Body
 			exists = true
 			break
 		}
@@ -237,15 +209,12 @@ func syncNoteHandlerInner(w http.ResponseWriter, r *http.Request, raw bool) {
 	// If the note does not exist, add it
 	if !exists {
 		note := Note{
-      Title:  updatedNote.Title,
-      Body:   updatedNote.Body,
-      Shared: false,
-    }
-    if !raw {
-      note.Body = string(mdToHTML([]byte(updatedNote.Body)))
-    }
+			Title:  updatedNote.Title,
+			Body:   updatedNote.Body,
+			Shared: false,
+		}
 
-    notes = append(notes, note)
+		notes = append(notes, note)
 	}
 
 	saveNotes()
@@ -268,7 +237,7 @@ func readNoteHandler(w http.ResponseWriter, r *http.Request) {
 	for _, note := range notes {
 		if note.Title == title {
 			if note.Shared {
-        renderNoteHTML(w, note)
+				renderNoteHTML(w, note)
 				return
 			} else {
 				user, pass, ok := r.BasicAuth()
@@ -278,7 +247,7 @@ func readNoteHandler(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-        renderNoteHTML(w, note)
+				renderNoteHTML(w, note)
 				return
 			}
 		}
@@ -288,8 +257,33 @@ func readNoteHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func isMd(note Note) bool {
+	return strings.Contains(note.Title, ".md") || !strings.Contains(note.Title, ".")
+}
+
+func guessMimeType(note Note) string {
+	parts := strings.Split(note.Title, ".")
+	if len(parts) == 0 {
+		return "text/html"
+	}
+
+	ext := "." + parts[len(parts)-1]
+	fmt.Println("Ext:", mime.TypeByExtension(ext))
+	return mime.TypeByExtension(ext)
+}
+
 func renderNoteHTML(w http.ResponseWriter, note Note) {
-  s := `
+	if !isMd(note) {
+		// TODO
+		// t := guessMimeType(note)
+		w.Header().Set("Content-Type", "text/html")
+
+		fmt.Fprintf(w, note.Body)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	s := `
 <html>
   <head>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
@@ -354,9 +348,9 @@ func renderNoteHTML(w http.ResponseWriter, note Note) {
     </script>
   </body>
 </html>`
-  fmt.Fprintf(w, s, note.Title, note.Body, note.Title)
-  w.Header().Set("Content-Type", "text/html")
-  w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, s, note.Title, note.Body, note.Title)
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
 }
 
 // Middleware to enforce HTTP basic authentication
