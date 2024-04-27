@@ -1,5 +1,8 @@
 ## livenotes
 
+> [!IMPORTANT] 
+> No longer maintained. See https://github.com/littledivy/bin instead.
+
 ### Deploy
 
 The service can be self-hosted or deployed on fly.io.
